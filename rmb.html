@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人民币大小写转换系统</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    min-height: 100vh; display: flex; justify-content: center; align-items: center;
+    padding: 20px;
+}
+.container {
+    max-width: 520px; width: 100%;
+    background: rgba(255,255,255,0.06);
+    border-radius: 20px; padding: 40px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+}
+h1 {
+    text-align: center; color: #e94560; font-size: 1.8rem;
+    margin-bottom: 6px; letter-spacing: 2px;
+}
+.subtitle { text-align: center; color: #a0a0b8; margin-bottom: 30px; font-size: 0.9rem; }
+
+.input-group { position: relative; margin-bottom: 20px; }
+.input-group label {
+    display: block; color: #ccc; font-size: 0.9rem;
+    margin-bottom: 8px; font-weight: 500;
+}
+.input-row {
+    display: flex; gap: 12px; align-items: center;
+}
+input {
+    flex: 1; padding: 14px 18px; border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 12px; font-size: 1.2rem; background: rgba(255,255,255,0.05);
+    color: #fff; outline: none; transition: border-color 0.3s;
+    font-family: "SF Mono", "Menlo", monospace;
+}
+input:focus { border-color: #e94560; }
+input::placeholder { color: #555; }
+.swap-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05);
+    color: #aaa; font-size: 1.2rem; cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.swap-btn:hover { border-color: #e94560; color: #e94560; }
+
+.result-box {
+    background: rgba(233,69,96,0.08); border: 2px dashed rgba(233,69,96,0.3);
+    border-radius: 12px; padding: 20px; margin-bottom: 20px;
+    min-height: 60px; display: flex; align-items: center;
+    word-break: break-all; color: #e94560; font-size: 1.3rem;
+    font-weight: 700; letter-spacing: 2px; text-align: center;
+    justify-content: center; transition: all 0.3s;
+}
+.result-box.placeholder { color: #555; font-size: 1rem; font-weight: 400; letter-spacing: 0; }
+
+.direction-hint {
+    display: flex; gap: 8px; justify-content: center; margin-bottom: 24px;
+}
+.tag {
+    padding: 4px 14px; border-radius: 20px; font-size: 0.8rem;
+    background: rgba(233,69,96,0.15); color: #e94560; font-weight: 600;
+    letter-spacing: 1px;
+}
+
+.history-section { margin-top: 24px; }
+.history-title {
+    color: #ccc; font-size: 1rem; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.history-list { list-style: none; max-height: 300px; overflow-y: auto; }
+.history-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 6px;
+    background: rgba(255,255,255,0.03); font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.history-item:hover { background: rgba(255,255,255,0.06); }
+.history-arrow { color: #e94560; font-weight: 700; flex-shrink: 0; }
+.history-from { color: #aaa; flex-shrink: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-to { color: #e94560; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-time { color: #555; font-size: 0.75rem; flex-shrink: 0; }
+.clear-btn {
+    background: none; border: none; color: #666; cursor: pointer;
+    font-size: 0.8rem; padding: 2px 8px; border-radius: 4px;
+}
+.clear-btn:hover { color: #e94560; background: rgba(233,69,96,0.1); }
+.empty-history { text-align: center; color: #444; padding: 20px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>人民币大小写转换</h1>
+    <p class="subtitle">阿拉伯数字 &harr; 中文大写金额</p>
+
+    <div class="direction-hint" id="directionTag">
+        <span class="tag" id="tagDir">数字 → 大写</span>
+        <span class="tag">双向转换</span>
+    </div>
+
+    <div class="input-group">
+        <label for="inputAmount">输入金额</label>
+        <div class="input-row">
+            <input type="text" id="inputAmount" placeholder="如：1234.56 或 壹仟贰佰叁拾肆元伍角陆分" autofocus>
+            <button class="swap-btn" onclick="swapDirection()" title="切换方向">&#8644;</button>
+        </div>
+    </div>
+
+    <div class="result-box placeholder" id="resultBox">等待输入</div>
+
+    <div class="history-section">
+        <div class="history-title">
+            <span>转换记录</span>
+            <button class="clear-btn" onclick="clearHistory()">清空</button>
+        </div>
+        <ul class="history-list" id="historyList">
+            <li class="empty-history">暂无记录</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+// ─── 数字转大写核心 ───
+const DIGITS = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+const INT_UNITS = ['', '拾', '佰', '仟'];
+const BIG_UNITS = ['', '万', '亿', '万亿'];
+
+function numToChinese(num) {
+    if (num === 0) return '零元整';
+
+    // 整数和小数部分
+    const numStr = Math.abs(num).toFixed(2);
+    const [intStr, decStr] = numStr.split('.');
+    const intPart = parseInt(intStr, 10);
+
+    // 处理小数部分（角分）
+    const jiao = parseInt(decStr[0], 10);
+    const fen = parseInt(decStr[1], 10);
+
+    // 处理整数部分
+    let intChinese = '';
+    if (intPart === 0) {
+        intChinese = '零';
+    } else {
+        intChinese = convertInteger(intStr);
+    }
+
+    // 拼接
+    let result = '';
+    if (intPart > 0) {
+        result = intChinese + '元';
+    } else if (jiao === 0 && fen === 0) {
+        result = '零元整';
+    }
+
+    if (jiao === 0 && fen === 0 && intPart > 0) {
+        result += '整';
+    } else {
+        if (jiao > 0) {
+            if (intPart === 0) result = '';
+            result += DIGITS[jiao] + '角';
+        } else if (intPart > 0) {
+            result += '零';
+        }
+        if (fen > 0) {
+            if (intPart === 0 && jiao === 0) result = '';
+            result += DIGITS[fen] + '分';
+        }
+    }
+
+    return (num < 0 ? '负' : '') + result;
+}
+
+function convertInteger(intStr) {
+    // 按4位分组，从低位到高位
+    const groups = [];
+    let s = intStr;
+    while (s.length > 0) {
+        const start = Math.max(0, s.length - 4);
+        groups.unshift(s.slice(start));
+        s = s.slice(0, start);
+    }
+
+    let result = '';
+    for (let i = 0; i < groups.length; i++) {
+        const groupChinese = convertGroup(groups[i]);
+        const bigUnit = BIG_UNITS[groups.length - 1 - i];
+        if (groupChinese !== '') {
+            if (result !== '' && groups[i].length < 4 && !result.endsWith('零')) {
+                result += '零';
+            }
+            result += groupChinese + bigUnit;
+        } else if (i === groups.length - 1) {
+            // 最后一组为空，跳过
+        }
+    }
+
+    // 去掉末尾万/亿前多余的零
+    result = result.replace(/零+$/, '');
+    if (result === '') result = '零';
+
+    return result;
+}
+
+function convertGroup(s) {
+    // 转换4位以内的数字
+    const n = s.length;
+    let result = '';
+    let hasZero = false;
+
+    for (let i = 0; i < n; i++) {
+        const d = parseInt(s[i], 10);
+        const unit = INT_UNITS[n - 1 - i];
+
+        if (d === 0) {
+            hasZero = true;
+        } else {
+            if (hasZero && result !== '') {
+                result += '零';
+            }
+            result += DIGITS[d] + unit;
+            hasZero = false;
+        }
+    }
+
+    return result;
+}
+
+// ─── 大写转数字核心 ───
+const CN_DIGITS = { '零': 0, '壹': 1, '贰': 2, '叁': 3, '肆': 4, '伍': 5, '陆': 6, '柒': 7, '捌': 8, '玖': 9 };
+const CN_UNITS = { '拾': 10, '佰': 100, '仟': 1000 };
+const CN_BIG = { '万': 10000, '亿': 100000000 };
+
+function chineseToNum(cnStr) {
+    let s = cnStr.replace(/\s+/g, '').replace(/整$/, '').replace(/正$/, '');
+    const isNegative = s.startsWith('负');
+    if (isNegative) s = s.slice(1);
+
+    // 分离元和角分
+    const yuanIdx = s.indexOf('元');
+    let yuanStr = '', jiaoFenStr = '';
+    if (yuanIdx >= 0) {
+        yuanStr = s.slice(0, yuanIdx);
+        jiaoFenStr = s.slice(yuanIdx + 1);
+    } else {
+        jiaoFenStr = s;
+    }
+
+    let total = 0;
+
+    // 处理元
+    if (yuanStr) {
+        total += parseYuan(yuanStr);
+    }
+
+    // 处理角分
+    if (jiaoFenStr) {
+        const jiaoIdx = jiaoFenStr.indexOf('角');
+        const fenIdx = jiaoFenStr.indexOf('分');
+        let jiao = 0, fen = 0;
+        if (jiaoIdx >= 0) {
+            const beforeJiao = jiaoFenStr.slice(0, jiaoIdx);
+            jiao = CN_DIGITS[beforeJiao.slice(-1)] || 0;
+        }
+        if (fenIdx >= 0) {
+            const beforeFen = jiaoFenStr.slice(0, fenIdx);
+            // 取角之后到分之前的最后一个数字
+            const afterJiao = jiaoIdx >= 0 ? jiaoFenStr.slice(jiaoIdx + 1, fenIdx) : jiaoFenStr.slice(0, fenIdx);
+            if (jiaoIdx < 0) {
+                // "叁分" 没有角
+                fen = CN_DIGITS[jiaoFenStr.slice(fenIdx - 1, fenIdx)] || 0;
+            } else {
+                const lastDigit = afterJiao.length > 0 ? afterJiao.slice(-1) : '';
+                fen = CN_DIGITS[lastDigit] || 0;
+            }
+        }
+        total += jiao * 0.1 + fen * 0.01;
+    }
+
+    return isNegative ? -total : total;
+}
+
+function parseYuan(s) {
+    let num = 0;
+    let section = 0;
+    let unit = 1;
+
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (CN_DIGITS[ch] !== undefined) {
+            section = CN_DIGITS[ch];
+            if (i === s.length - 1) num += section;
+        } else if (CN_UNITS[ch] !== undefined) {
+            section = (section || 1) * CN_UNITS[ch];
+            num += section;
+            section = 0;
+        } else if (CN_BIG[ch] !== undefined) {
+            num = (num + section) * CN_BIG[ch];
+            section = 0;
+        }
+    }
+
+    return num + section;
+}
+
+// ─── 判断输入类型 ───
+function isChinese(s) {
+    return /^[\u4e00-\u9fff]/.test(s.trim());
+}
+
+function isValidNumber(s) {
+    return /^-?\d+(\.\d{1,2})?$/.test(s.trim());
+}
+
+function isValidChinese(s) {
+    return /^负?([壹贰叁肆伍陆柒捌玖拾佰仟零万亿]+元)?([壹贰叁肆伍陆柒捌玖零]+[角分])?(整|正)?$/.test(s.replace(/\s+/g, ''));
+}
+
+// ─── 界面逻辑 ───
+let mode = 'auto'; // 'auto' | 'num2cn' | 'cn2num'
+let history = [];
+
+const inputEl = document.getElementById('inputAmount');
+const resultBox = document.getElementById('resultBox');
+const historyList = document.getElementById('historyList');
+const tagDir = document.getElementById('tagDir');
+
+inputEl.addEventListener('input', convert);
+inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') convert();
+});
+
+function convert() {
+    const val = inputEl.value.trim();
+    if (!val) {
+        resultBox.textContent = '等待输入';
+        resultBox.className = 'result-box placeholder';
+        return;
+    }
+
+    let result;
+    if (mode === 'num2cn') {
+        result = handleNum2Cn(val);
+    } else if (mode === 'cn2num') {
+        result = handleCn2Num(val);
+    } else {
+        // 自动检测
+        if (isChinese(val)) {
+            result = handleCn2Num(val);
+        } else {
+            result = handleNum2Cn(val);
+        }
+    }
+
+    if (result !== null) {
+        resultBox.textContent = result;
+        resultBox.className = 'result-box';
+        addHistory(val, result);
+    }
+}
+
+function handleNum2Cn(val) {
+    if (!isValidNumber(val)) {
+        resultBox.textContent = '请输入有效数字（最多两位小数）';
+        resultBox.className = 'result-box placeholder';
+        return null;
+    }
+    const num = parseFloat(val);
+    if (Math.abs(num) >= 1e16) {
+        resultBox.textContent = '金额过大，请输入小于千万亿的数字';
+        resultBox.className = 'result-box placeholder';
+        return null;
+    }
+    return numToChinese(num);
+}
+
+function handleCn2Num(val) {
+    if (!isValidChinese(val)) {
+        resultBox.textContent = '请输入有效的大写金额（如：壹仟贰佰叁拾肆元伍角陆分）';
+        resultBox.className = 'result-box placeholder';
+        return null;
+    }
+    const num = chineseToNum(val);
+    return num.toFixed(2);
+}
+
+function addHistory(from, to) {
+    // 避免连续重复
+    if (history.length > 0 && history[0].from === from && history[0].to === to) return;
+
+    history.unshift({ from, to, time: new Date().toLocaleTimeString() });
+    if (history.length > 50) history.pop();
+    renderHistory();
+}
+
+function renderHistory() {
+    if (history.length === 0) {
+        historyList.innerHTML = '<li class="empty-history">暂无记录</li>';
+        return;
+    }
+    historyList.innerHTML = history.map(h => `
+        <li class="history-item">
+            <span class="history-from" title="${h.from}">${h.from}</span>
+            <span class="history-arrow">&rarr;</span>
+            <span class="history-to" title="${h.to}">${h.to}</span>
+            <span class="history-time">${h.time}</span>
+        </li>
+    `).join('');
+}
+
+function clearHistory() {
+    history = [];
+    renderHistory();
+}
+
+function swapDirection() {
+    if (mode === 'auto') mode = 'num2cn';
+    else if (mode === 'num2cn') mode = 'cn2num';
+    else if (mode === 'cn2num') mode = 'auto';
+
+    const labels = { auto: '自动检测', num2cn: '数字 → 大写', cn2num: '大写 → 数字' };
+    tagDir.textContent = labels[mode];
+    convert();
+}
+</script>
+</body>
+</html>
